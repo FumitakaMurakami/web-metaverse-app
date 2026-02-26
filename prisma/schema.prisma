@@ -1,0 +1,119 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  user_id    String   @id @default(uuid()) @db.Uuid
+  email      String   @unique
+  name       String?
+  password   String?
+  avatar_url String?
+  provider   String?
+  provider_id String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Thread {
+  thread_id  String   @id @default(uuid()) @db.Uuid
+  title      String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  join_users JoinUser[]
+  chat_logs  ChatLog[]
+
+  @@map("threads")
+}
+
+model JoinUser {
+  id         String   @id @default(uuid()) @db.Uuid
+  thread_id  String   @db.Uuid
+  user_id    String   @db.Uuid
+  user_name  String?
+  joined_at  DateTime @default(now())
+
+  thread Thread @relation(fields: [thread_id], references: [thread_id], onDelete: Cascade)
+
+  @@unique([thread_id, user_id])
+  @@map("join_users")
+}
+
+model ChatLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  thread_id  String   @db.Uuid
+  sender_id  String   @db.Uuid
+  message    String
+  created_at DateTime @default(now())
+
+  thread Thread  @relation(fields: [thread_id], references: [thread_id], onDelete: Cascade)
+  media  Media[]
+
+  @@map("chat_logs")
+}
+
+model Media {
+  id          String   @id @default(uuid()) @db.Uuid
+  chat_log_id String   @db.Uuid
+  url         String
+  media_type  String
+  created_at  DateTime @default(now())
+
+  chat_log ChatLog @relation(fields: [chat_log_id], references: [id], onDelete: Cascade)
+
+  @@map("media")
+}
+
+model Account {
+  id                String  @id @default(uuid()) @db.Uuid
+  user_id           String  @db.Uuid
+  type              String
+  provider          String
+  provider_account_id String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  @@unique([provider, provider_account_id])
+  @@map("accounts")
+}
+
+model MetaverseSession {
+  session_id  String   @id @default(uuid()) @db.Uuid
+  name        String
+  owner_id    String   @db.Uuid
+  room_code   String   @unique
+  is_active   Boolean  @default(true)
+  max_users   Int      @default(10)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  invites SessionInvite[]
+
+  @@map("metaverse_sessions")
+}
+
+model SessionInvite {
+  id          String   @id @default(uuid()) @db.Uuid
+  session_id  String   @db.Uuid
+  inviter_id  String   @db.Uuid
+  invitee_id  String   @db.Uuid
+  status      String   @default("pending") // pending, accepted, declined
+  created_at  DateTime @default(now())
+
+  session MetaverseSession @relation(fields: [session_id], references: [session_id], onDelete: Cascade)
+
+  @@unique([session_id, invitee_id])
+  @@map("session_invites")
+}

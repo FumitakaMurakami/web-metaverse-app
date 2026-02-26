@@ -1,0 +1,60 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: sns_sumple_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: sns_sumple
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  naf-server:
+    build:
+      context: .
+      dockerfile: naf-server/Dockerfile
+    container_name: sns_sumple_naf
+    restart: unless-stopped
+    ports:
+      - "8888:8888"
+    environment:
+      NAF_PORT: 8888
+      CORS_ORIGIN: http://localhost:3000
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sns_sumple_app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/sns_sumple?schema=public
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-your-secret-key-change-this-in-production}
+      NEXT_PUBLIC_NAF_SERVER_URL: http://localhost:8888
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:-}
+      MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:-}
+      TWITTER_CLIENT_ID: ${TWITTER_CLIENT_ID:-}
+      TWITTER_CLIENT_SECRET: ${TWITTER_CLIENT_SECRET:-}
+      INSTAGRAM_CLIENT_ID: ${INSTAGRAM_CLIENT_ID:-}
+      INSTAGRAM_CLIENT_SECRET: ${INSTAGRAM_CLIENT_SECRET:-}
+    depends_on:
+      db:
+        condition: service_healthy
+      naf-server:
+        condition: service_started
+
+volumes:
+  postgres_data:
