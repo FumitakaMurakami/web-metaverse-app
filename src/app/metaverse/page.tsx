@@ -3,6 +3,11 @@
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
+import Image from "next/image";
+import {
+  ENVIRONMENT_PRESETS,
+  getPresetById,
+} from "@/lib/environmentPresets";
 
 interface SessionInvite {
   id: string;
@@ -16,6 +21,7 @@ interface MetaverseSession {
   owner_id: string;
   room_code: string;
   is_active: boolean;
+  environment_preset: string;
   created_at: string;
   invites: SessionInvite[];
 }
@@ -46,6 +52,7 @@ export default function MetaversePage() {
   const [invitedSessions, setInvitedSessions] = useState<InvitedSession[]>([]);
   const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
   const [newSessionName, setNewSessionName] = useState("");
+  const [selectedPreset, setSelectedPreset] = useState("default");
   const [creating, setCreating] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -89,10 +96,14 @@ export default function MetaversePage() {
       const res = await fetch("/api/metaverse/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newSessionName }),
+        body: JSON.stringify({
+          name: newSessionName,
+          environment_preset: selectedPreset,
+        }),
       });
       if (res.ok) {
         setNewSessionName("");
+        setSelectedPreset("default");
         fetchData();
       }
     } catch (error) {
@@ -180,23 +191,83 @@ export default function MetaversePage() {
         <h2 className="text-lg font-semibold text-gray-900 mb-4">
           新しい空間を作成
         </h2>
-        <div className="flex gap-2">
+
+        {/* Name input */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            空間の名前
+          </label>
           <input
             type="text"
             value={newSessionName}
             onChange={(e) => setNewSessionName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && createSession()}
             placeholder="空間の名前を入力"
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          <button
-            onClick={createSession}
-            disabled={creating || !newSessionName.trim()}
-            className="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
-          >
-            {creating ? "作成中..." : "作成"}
-          </button>
         </div>
+
+        {/* Environment preset selection */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            ワールドを選択
+          </label>
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 max-h-80 overflow-y-auto pr-1">
+            {ENVIRONMENT_PRESETS.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => setSelectedPreset(preset.id)}
+                className={`relative rounded-lg overflow-hidden border-2 transition-all text-left ${
+                  selectedPreset === preset.id
+                    ? "border-blue-500 ring-2 ring-blue-200 scale-[1.02]"
+                    : "border-gray-200 hover:border-gray-300"
+                }`}
+              >
+                <div className="aspect-video bg-gray-100 relative">
+                  <Image
+                    src={preset.thumbnail}
+                    alt={preset.label}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 640px) 33vw, 25vw"
+                  />
+                </div>
+                <div className="px-1.5 py-1 text-center bg-white">
+                  <p className="text-xs font-medium text-gray-700 truncate">
+                    {preset.label}
+                  </p>
+                </div>
+                {selectedPreset === preset.id && (
+                  <div className="absolute top-1 right-1 bg-blue-500 text-white rounded-full w-5 h-5 flex items-center justify-center shadow">
+                    <svg
+                      className="w-3 h-3"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={3}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Create button */}
+        <button
+          onClick={createSession}
+          disabled={creating || !newSessionName.trim()}
+          className="w-full bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 transition disabled:opacity-50 font-medium"
+        >
+          {creating ? "作成中..." : "作成"}
+        </button>
       </div>
 
       {/* Pending Invites */}
@@ -211,13 +282,31 @@ export default function MetaversePage() {
                 key={invite.id}
                 className="flex items-center justify-between bg-white p-4 rounded-lg"
               >
-                <div>
-                  <p className="font-medium text-gray-900">
-                    {invite.session.name}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    ルーム: {invite.session.room_code}
-                  </p>
+                <div className="flex items-center gap-3">
+                  {/* Environment thumbnail */}
+                  <div className="w-16 h-11 rounded overflow-hidden bg-gray-200 shrink-0 relative">
+                    <Image
+                      src={
+                        getPresetById(invite.session.environment_preset)
+                          ?.thumbnail || "/environments/default.jpg"
+                      }
+                      alt={
+                        getPresetById(invite.session.environment_preset)
+                          ?.label || "環境"
+                      }
+                      fill
+                      className="object-cover"
+                      sizes="64px"
+                    />
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">
+                      {invite.session.name}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      ルーム: {invite.session.room_code}
+                    </p>
+                  </div>
                 </div>
                 <div className="flex gap-2">
                   <button
@@ -255,25 +344,42 @@ export default function MetaversePage() {
                 key={s.session_id}
                 className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
               >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium text-gray-900">{s.name}</p>
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded-full ${
-                        s.is_active
-                          ? "bg-green-100 text-green-700"
-                          : "bg-gray-200 text-gray-500"
-                      }`}
-                    >
-                      {s.is_active ? "アクティブ" : "終了"}
-                    </span>
+                <div className="flex items-center gap-3">
+                  {/* Environment thumbnail */}
+                  <div className="w-16 h-11 rounded overflow-hidden bg-gray-200 shrink-0 relative">
+                    <Image
+                      src={
+                        getPresetById(s.environment_preset)?.thumbnail ||
+                        "/environments/default.jpg"
+                      }
+                      alt={
+                        getPresetById(s.environment_preset)?.label || "環境"
+                      }
+                      fill
+                      className="object-cover"
+                      sizes="64px"
+                    />
                   </div>
-                  <p className="text-sm text-gray-500">
-                    ルーム: {s.room_code} / 招待:{" "}
-                    {s.invites?.filter((i) => i.status === "accepted").length ||
-                      0}
-                    人
-                  </p>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-gray-900">{s.name}</p>
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full ${
+                          s.is_active
+                            ? "bg-green-100 text-green-700"
+                            : "bg-gray-200 text-gray-500"
+                        }`}
+                      >
+                        {s.is_active ? "アクティブ" : "終了"}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-500">
+                      ルーム: {s.room_code} / 招待:{" "}
+                      {s.invites?.filter((i) => i.status === "accepted")
+                        .length || 0}
+                      人
+                    </p>
+                  </div>
                 </div>
                 <div className="flex gap-2">
                   {s.is_active && (
@@ -323,13 +429,31 @@ export default function MetaversePage() {
                 key={inv.id}
                 className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
               >
-                <div>
-                  <p className="font-medium text-gray-900">
-                    {inv.session.name}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    ルーム: {inv.session.room_code}
-                  </p>
+                <div className="flex items-center gap-3">
+                  {/* Environment thumbnail */}
+                  <div className="w-16 h-11 rounded overflow-hidden bg-gray-200 shrink-0 relative">
+                    <Image
+                      src={
+                        getPresetById(inv.session.environment_preset)
+                          ?.thumbnail || "/environments/default.jpg"
+                      }
+                      alt={
+                        getPresetById(inv.session.environment_preset)?.label ||
+                        "環境"
+                      }
+                      fill
+                      className="object-cover"
+                      sizes="64px"
+                    />
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">
+                      {inv.session.name}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      ルーム: {inv.session.room_code}
+                    </p>
+                  </div>
                 </div>
                 {inv.session.is_active && (
                   <button

@@ -12,3 +12,8 @@ declare module "networked-aframe" {
   const NAF: unknown;
   export default NAF;
 }
+
+declare module "aframe-environment-component" {
+  const aframeEnvironmentComponent: unknown;
+  export default aframeEnvironmentComponent;
+}

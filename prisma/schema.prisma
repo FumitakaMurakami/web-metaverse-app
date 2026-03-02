@@ -90,16 +90,18 @@ model Account {
 }
 
 model MetaverseSession {
-  session_id  String   @id @default(uuid()) @db.Uuid
-  name        String
-  owner_id    String   @db.Uuid
-  room_code   String   @unique
-  is_active   Boolean  @default(true)
-  max_users   Int      @default(10)
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
+  session_id         String   @id @default(uuid()) @db.Uuid
+  name               String
+  owner_id           String   @db.Uuid
+  room_code          String   @unique
+  is_active          Boolean  @default(true)
+  max_users          Int      @default(10)
+  environment_preset String   @default("default")
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
 
   invites SessionInvite[]
+  assets  UploadedAsset[]
 
   @@map("metaverse_sessions")
 }
@@ -116,4 +118,20 @@ model SessionInvite {
 
   @@unique([session_id, invitee_id])
   @@map("session_invites")
+}
+
+model UploadedAsset {
+  asset_id    String   @id @default(uuid()) @db.Uuid
+  session_id  String   @db.Uuid
+  uploader_id String   @db.Uuid
+  file_name   String
+  stored_name String
+  file_type   String   // "model" | "image"
+  mime_type   String
+  file_size   Int
+  created_at  DateTime @default(now())
+
+  session MetaverseSession @relation(fields: [session_id], references: [session_id], onDelete: Cascade)
+
+  @@map("uploaded_assets")
 }

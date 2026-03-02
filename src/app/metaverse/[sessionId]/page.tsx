@@ -16,6 +16,7 @@ interface MetaverseSession {
   room_code: string;
   is_active: boolean;
   owner_id: string;
+  environment_preset: string;
 }
 
 export default function MetaverseRoomPage() {
@@ -136,6 +137,8 @@ export default function MetaverseRoomPage() {
           roomCode={metaverseSession.room_code}
           nafServerUrl={nafServerUrl}
           userName={session?.user?.name || undefined}
+          sessionId={metaverseSession.session_id}
+          environmentPreset={metaverseSession.environment_preset}
         />
       </div>
     </div>

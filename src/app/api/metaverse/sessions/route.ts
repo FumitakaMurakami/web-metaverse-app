@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { v4 as uuidv4 } from "uuid";
+import { isValidPreset } from "@/lib/environmentPresets";
 
 // GET: List sessions the user owns or is invited to
 export async function GET() {
@@ -46,10 +47,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
     }
 
-    const { name } = await request.json();
+    const { name, environment_preset } = await request.json();
     if (!name?.trim()) {
       return NextResponse.json(
         { error: "セッション名を入力してください" },
+        { status: 400 }
+      );
+    }
+
+    const preset = environment_preset || "default";
+    if (!isValidPreset(preset)) {
+      return NextResponse.json(
+        { error: "無効な環境プリセットです" },
         { status: 400 }
       );
     }
@@ -61,6 +70,7 @@ export async function POST(request: NextRequest) {
         name: name.trim(),
         owner_id: session.user.id,
         room_code: roomCode,
+        environment_preset: preset,
       },
     });
 
