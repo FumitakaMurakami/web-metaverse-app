@@ -1,16 +1,36 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
-export default function SignInPage() {
+function SignInForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") || "";
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isPublicSession, setIsPublicSession] = useState(false);
+  const [guestLoading, setGuestLoading] = useState(false);
+
+  // Detect if redirected from a public metaverse session
+  useEffect(() => {
+    const match = callbackUrl.match(/\/metaverse\/([^/?]+)/);
+    if (!match) return;
+    const sessionId = match[1];
+    fetch(`/api/metaverse/sessions/${sessionId}/public`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.session?.is_public) {
+          setIsPublicSession(true);
+        }
+      })
+      .catch(() => {});
+  }, [callbackUrl]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,13 +47,30 @@ export default function SignInPage() {
       if (result?.error) {
         setError(result.error);
       } else {
-        router.push("/mypage");
+        router.push(callbackUrl || "/mypage");
         router.refresh();
       }
     } catch {
       setError("ログインに失敗しました");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGuestEntry = async () => {
+    setGuestLoading(true);
+    try {
+      const result = await signIn("guest", { redirect: false });
+      if (result?.error) {
+        setError("ゲストログインに失敗しました");
+      } else {
+        router.push(callbackUrl);
+        router.refresh();
+      }
+    } catch {
+      setError("ゲストログインに失敗しました");
+    } finally {
+      setGuestLoading(false);
     }
   };
 
@@ -98,7 +135,9 @@ export default function SignInPage() {
 
           <div className="mt-4 space-y-2">
             <button
-              onClick={() => signIn("google", { callbackUrl: "/mypage" })}
+              onClick={() =>
+                signIn("google", { callbackUrl: callbackUrl || "/mypage" })
+              }
               className="w-full flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 py-2.5 rounded-lg hover:bg-gray-50 transition text-sm"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -122,16 +161,47 @@ export default function SignInPage() {
               Googleでログイン
             </button>
             <button
-              onClick={() => signIn("twitter", { callbackUrl: "/mypage" })}
+              onClick={() =>
+                signIn("twitter", { callbackUrl: callbackUrl || "/mypage" })
+              }
               className="w-full flex items-center justify-center gap-2 bg-black text-white py-2.5 rounded-lg hover:bg-gray-800 transition text-sm"
             >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+              <svg
+                className="w-5 h-5"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+              >
                 <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
               </svg>
               X (Twitter) でログイン
             </button>
           </div>
         </div>
+
+        {isPublicSession && (
+          <div className="mt-4">
+            <div className="relative mb-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="bg-gray-50 px-2 text-gray-500">
+                  ゲスト入室
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={handleGuestEntry}
+              disabled={guestLoading}
+              className="w-full bg-gray-100 text-gray-700 py-2.5 rounded-lg hover:bg-gray-200 transition font-medium disabled:opacity-50 border border-gray-300"
+            >
+              {guestLoading ? "入室中..." : "ゲストで入室"}
+            </button>
+            <p className="text-xs text-gray-400 text-center mt-1">
+              アカウント不要で入室できます
+            </p>
+          </div>
+        )}
 
         <p className="mt-6 text-center text-sm text-gray-600">
           アカウントをお持ちでないですか？{" "}
@@ -144,5 +214,19 @@ export default function SignInPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-[calc(100vh-56px)]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+        </div>
+      }
+    >
+      <SignInForm />
+    </Suspense>
   );
 }

@@ -95,6 +95,7 @@ model MetaverseSession {
   owner_id           String   @db.Uuid
   room_code          String   @unique
   is_active          Boolean  @default(true)
+  is_public          Boolean  @default(false)
   max_users          Int      @default(10)
   environment_preset String   @default("default")
   created_at         DateTime @default(now())

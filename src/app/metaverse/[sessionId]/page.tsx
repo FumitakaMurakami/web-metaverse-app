@@ -1,9 +1,10 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useSession, signIn } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
+import SharePopover from "@/components/SharePopover";
 
 const AFrameScene = dynamic(
   () => import("@/components/metaverse/AFrameScene"),
@@ -15,7 +16,15 @@ interface MetaverseSession {
   name: string;
   room_code: string;
   is_active: boolean;
+  is_public: boolean;
   owner_id: string;
+  environment_preset: string;
+}
+
+interface PublicSessionInfo {
+  name: string;
+  is_public: boolean;
+  is_active: boolean;
   environment_preset: string;
 }
 
@@ -29,6 +38,8 @@ export default function MetaverseRoomPage() {
     useState<MetaverseSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [publicInfo, setPublicInfo] = useState<PublicSessionInfo | null>(null);
+  const [guestLoading, setGuestLoading] = useState(false);
 
   const nafServerUrl =
     process.env.NEXT_PUBLIC_NAF_SERVER_URL || "http://localhost:8080";
@@ -50,15 +61,128 @@ export default function MetaverseRoomPage() {
     }
   }, [sessionId]);
 
+  // Unauthenticated: check if public session, otherwise redirect to signin
   useEffect(() => {
-    if (status === "unauthenticated") router.push("/auth/signin");
-  }, [status, router]);
+    if (status !== "unauthenticated") return;
+
+    const checkPublic = async () => {
+      try {
+        const res = await fetch(
+          `/api/metaverse/sessions/${sessionId}/public`
+        );
+        if (!res.ok) {
+          router.push(`/auth/signin?callbackUrl=/metaverse/${sessionId}`);
+          return;
+        }
+        const data = await res.json();
+        if (data.session.is_public) {
+          setPublicInfo(data.session);
+          setLoading(false);
+        } else {
+          router.push(`/auth/signin?callbackUrl=/metaverse/${sessionId}`);
+        }
+      } catch {
+        router.push(`/auth/signin?callbackUrl=/metaverse/${sessionId}`);
+      }
+    };
+    checkPublic();
+  }, [status, router, sessionId]);
 
   useEffect(() => {
     if (session && sessionId) fetchSession();
   }, [session, sessionId, fetchSession]);
 
-  if (status === "loading" || loading) {
+  const handleGuestEntry = async () => {
+    setGuestLoading(true);
+    try {
+      const result = await signIn("guest", { redirect: false });
+      if (result?.error) {
+        setError("ゲストログインに失敗しました");
+      }
+    } catch {
+      setError("ゲストログインに失敗しました");
+    } finally {
+      setGuestLoading(false);
+    }
+  };
+
+  // Guest entry screen for public rooms when unauthenticated
+  if (status === "unauthenticated" && publicInfo) {
+    return (
+      <div className="min-h-[calc(100vh-56px)] flex items-center justify-center px-4">
+        <div className="w-full max-w-md text-center">
+          <div className="mb-6">
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg
+                className="w-8 h-8 text-blue-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"
+                />
+              </svg>
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              {publicInfo.name}
+            </h1>
+            <p className="text-gray-500">
+              この空間に入室しますか？
+            </p>
+          </div>
+
+          {error && (
+            <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">
+              {error}
+            </div>
+          )}
+
+          {!publicInfo.is_active ? (
+            <p className="text-red-600 mb-4">このセッションは終了しています</p>
+          ) : (
+            <div className="space-y-3">
+              <button
+                onClick={() =>
+                  router.push(
+                    `/auth/signin?callbackUrl=/metaverse/${sessionId}`
+                  )
+                }
+                className="w-full bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 transition font-medium"
+              >
+                ログインして入室
+              </button>
+              <button
+                onClick={handleGuestEntry}
+                disabled={guestLoading}
+                className="w-full bg-gray-100 text-gray-700 py-2.5 rounded-lg hover:bg-gray-200 transition font-medium disabled:opacity-50 border border-gray-300"
+              >
+                {guestLoading ? "入室中..." : "ゲストで入室"}
+              </button>
+              <p className="text-xs text-gray-400 mt-2">
+                ゲストは「ゲスト」として入室します。表示名は後から変更できます。
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Still loading (auth check or public info fetch)
+  if (status === "loading" || (status === "unauthenticated" && !publicInfo)) {
+    return (
+      <div className="flex items-center justify-center min-h-[calc(100vh-56px)]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+      </div>
+    );
+  }
+
+  // Authenticated but still loading session data
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-56px)]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
@@ -126,9 +250,15 @@ export default function MetaverseRoomPage() {
             </p>
           </div>
         </div>
-        <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
-          接続中
-        </span>
+        <div className="flex items-center gap-2">
+          <SharePopover
+            url={`${typeof window !== "undefined" ? window.location.origin : ""}/metaverse/${sessionId}`}
+            title={metaverseSession.name}
+          />
+          <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
+            接続中
+          </span>
+        </div>
       </div>
 
       {/* A-Frame scene */}

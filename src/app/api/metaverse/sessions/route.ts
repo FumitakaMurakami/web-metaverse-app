@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
     }
 
-    const { name, environment_preset } = await request.json();
+    const { name, environment_preset, is_public } = await request.json();
     if (!name?.trim()) {
       return NextResponse.json(
         { error: "セッション名を入力してください" },
@@ -71,6 +71,7 @@ export async function POST(request: NextRequest) {
         owner_id: session.user.id,
         room_code: roomCode,
         environment_preset: preset,
+        is_public: is_public === true,
       },
     });
 

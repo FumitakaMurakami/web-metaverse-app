@@ -8,6 +8,7 @@ import {
   ENVIRONMENT_PRESETS,
   getPresetById,
 } from "@/lib/environmentPresets";
+import SharePopover from "@/components/SharePopover";
 
 interface SessionInvite {
   id: string;
@@ -21,6 +22,7 @@ interface MetaverseSession {
   owner_id: string;
   room_code: string;
   is_active: boolean;
+  is_public: boolean;
   environment_preset: string;
   created_at: string;
   invites: SessionInvite[];
@@ -53,6 +55,7 @@ export default function MetaversePage() {
   const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
   const [newSessionName, setNewSessionName] = useState("");
   const [selectedPreset, setSelectedPreset] = useState("default");
+  const [isPublic, setIsPublic] = useState(false);
   const [creating, setCreating] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -99,11 +102,13 @@ export default function MetaversePage() {
         body: JSON.stringify({
           name: newSessionName,
           environment_preset: selectedPreset,
+          is_public: isPublic,
         }),
       });
       if (res.ok) {
         setNewSessionName("");
         setSelectedPreset("default");
+        setIsPublic(false);
         fetchData();
       }
     } catch (error) {
@@ -260,6 +265,48 @@ export default function MetaversePage() {
           </div>
         </div>
 
+        {/* Public/Private toggle */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            公開設定
+          </label>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setIsPublic(false)}
+              className={`flex-1 py-2 px-4 rounded-lg border-2 text-sm font-medium transition-all ${
+                !isPublic
+                  ? "border-blue-500 bg-blue-50 text-blue-700"
+                  : "border-gray-200 text-gray-500 hover:border-gray-300"
+              }`}
+            >
+              <svg className="w-4 h-4 inline-block mr-1 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              プライベート
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsPublic(true)}
+              className={`flex-1 py-2 px-4 rounded-lg border-2 text-sm font-medium transition-all ${
+                isPublic
+                  ? "border-green-500 bg-green-50 text-green-700"
+                  : "border-gray-200 text-gray-500 hover:border-gray-300"
+              }`}
+            >
+              <svg className="w-4 h-4 inline-block mr-1 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9" />
+              </svg>
+              公開
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mt-1">
+            {isPublic
+              ? "URLを知っている人は誰でも入室できます"
+              : "招待されたユーザーのみ入室できます"}
+          </p>
+        </div>
+
         {/* Create button */}
         <button
           onClick={createSession}
@@ -372,6 +419,11 @@ export default function MetaversePage() {
                       >
                         {s.is_active ? "アクティブ" : "終了"}
                       </span>
+                      {s.is_public && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                          公開
+                        </span>
+                      )}
                     </div>
                     <p className="text-sm text-gray-500">
                       ルーム: {s.room_code} / 招待:{" "}
@@ -381,9 +433,13 @@ export default function MetaversePage() {
                     </p>
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2">
                   {s.is_active && (
                     <>
+                      <SharePopover
+                        url={`${typeof window !== "undefined" ? window.location.origin : ""}/metaverse/${s.session_id}`}
+                        title={s.name}
+                      />
                       <button
                         onClick={() => {
                           setInviteModal(s.session_id);

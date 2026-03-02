@@ -28,13 +28,13 @@ export async function GET(
       );
     }
 
-    // Check access: owner or accepted invitee
+    // Check access: owner, accepted invitee, or public session
     const isOwner = metaverseSession.owner_id === session.user.id;
     const isInvited = metaverseSession.invites.some(
       (inv) => inv.invitee_id === session.user.id && inv.status === "accepted"
     );
 
-    if (!isOwner && !isInvited) {
+    if (!isOwner && !isInvited && !metaverseSession.is_public) {
       return NextResponse.json(
         { error: "このセッションへのアクセス権がありません" },
         { status: 403 }

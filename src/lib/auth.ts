@@ -3,6 +3,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import TwitterProvider from "next-auth/providers/twitter";
 import bcrypt from "bcryptjs";
+import { v4 as uuidv4 } from "uuid";
 import { prisma } from "./prisma";
 
 export const authOptions: NextAuthOptions = {
@@ -40,6 +41,25 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: user.name,
           image: user.avatar_url,
+        };
+      },
+    }),
+    CredentialsProvider({
+      id: "guest",
+      name: "Guest",
+      credentials: {},
+      async authorize() {
+        const guestUser = await prisma.user.create({
+          data: {
+            email: `guest_${uuidv4()}@guest.local`,
+            name: "ゲスト",
+            provider: "guest",
+          },
+        });
+        return {
+          id: guestUser.user_id,
+          email: guestUser.email,
+          name: guestUser.name,
         };
       },
     }),
